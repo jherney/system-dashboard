@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 import psutil
 
+HOST_BIND = os.environ.get("DASHBOARD_BIND", "0.0.0.0")
 PORT = int(os.environ.get("DASHBOARD_PORT", "8080"))
 SNAPSHOT_INTERVAL = 0.5   # fast sections: cpu / memory / network / disk
 SENSORS_INTERVAL = 5.0    # temperature & battery reads are comparatively slow
@@ -282,7 +283,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
+    server = ThreadingHTTPServer((HOST_BIND, PORT), Handler)
     print(f"System dashboard running at http://localhost:{PORT} ({HOST}, {PLATFORM})")
     try:
         server.serve_forever()
