@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Monitor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+  :root {
+    --bg: #02060f;
+    --panel: rgba(10, 20, 35, 0.85);
+    --panel-2: rgba(0, 255, 255, 0.1);
+    --border: #00ffff;
+    --text: #c0f8ff;
+    --muted: #0088aa;
+    --accent: #00ffff;
+    --green: #00ff66;
+    --yellow: #ffcc00;
+    --red: #ff3333;
+    --purple: #cc66ff;
+    --glow: 0 0 10px rgba(0, 255, 255, 0.2);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Share Tech Mono', "Courier New", monospace;
+    background: var(--bg);
+    background-image: 
+      linear-gradient(rgba(0, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 30px 30px;
+    background-position: -1px -1px;
+    color: var(--text);
+    padding: 20px;
+    text-shadow: 0 0 4px rgba(0, 255, 255, 0.4);
+  }
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+    box-shadow: 0 10px 20px -10px rgba(0, 255, 255, 0.3);
+  }
+  header h1 { font-size: 24px; margin: 0; font-weight: normal; text-transform: uppercase; letter-spacing: 3px; }
+  header h1 span { color: var(--accent); }
+  .meta { display: flex; gap: 18px; font-size: 14px; color: var(--muted); flex-wrap: wrap; text-transform: uppercase; }
+  .meta b { color: var(--text); font-weight: normal; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(320px, 1fr));
+    gap: 20px;
+  }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+    box-shadow: var(--glow);
+    position: relative;
+  }
+  /* Corner brackets for sci-fi look */
+  .card::before, .card::after {
+    content: '';
+    position: absolute;
+    width: 15px; height: 15px;
+    border: 2px solid var(--accent);
+    box-shadow: 0 0 5px var(--accent);
+  }
+  .card::before { top: -2px; left: -2px; border-right: none; border-bottom: none; }
+  .card::after { bottom: -2px; right: -2px; border-left: none; border-top: none; }
+
+  .card h2 {
+    margin: 0 0 12px;
+    font-size: 14px;
+    font-weight: normal;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .card h2 .val { color: var(--text); font-size: 18px; text-shadow: 0 0 8px var(--accent); }
+  .chart { width: 100%; height: 150px; display: block; margin-bottom: 8px; }
+  .stats-row { display: flex; gap: 16px; margin-top: 12px; font-size: 14px; }
+  .stats-row div { flex: 1; }
+  .stats-row .label { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+  .stats-row .num { font-size: 16px; font-weight: normal; color: var(--accent); }
+  .cores { display: flex; gap: 4px; margin-top: 12px; height: 40px; align-items: flex-end; }
+  .cores .core { flex: 1; background: var(--panel-2); border-radius: 2px; position: relative; overflow: hidden; border: 1px solid rgba(0,255,255,0.1); }
+  .cores .core i { position: absolute; bottom: 0; left: 0; right: 0; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .cores .core i::after {
+    content: attr(data-c);
+    position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+    font-size: 9px; color: var(--muted); text-shadow: none; white-space: nowrap;
+  }
+  .bars { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .bar-row { font-size: 13px; }
+  .bar-row .top { display: flex; justify-content: space-between; color: var(--muted); margin-bottom: 6px; gap: 8px; }
+  .bar-row .top b { color: var(--text); font-weight: normal; letter-spacing: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar { height: 10px; background: var(--panel-2); border-radius: 2px; overflow: hidden; border: 1px solid rgba(0,255,255,0.2); }
+  .bar i { display: block; height: 100%; box-shadow: 0 0 8px currentColor; transition: width 0.4s ease; }
+  .running-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--green); margin-right: 8px; box-shadow: 0 0 8px var(--green); }
+  .offline { color: var(--red); text-shadow: 0 0 8px var(--red); }
+  .proc-line { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 1px 0; }
+  .proc-line .pid { color: var(--muted); min-width: 5.5em; }
+  .proc-line .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+  .proc-line .pct { color: var(--accent); }
+  .sect-label { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+  .legend { display: flex; gap: 12px; font-size: 11px; color: var(--muted); text-transform: uppercase; margin-top: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 3px; vertical-align: middle; margin-right: 4px; box-shadow: 0 0 6px currentColor; }
+</style>
+</head>
+<body>
+<header>
+  <h1>System <span>Monitor</span></h1>
+  <div class="meta">
+    <div>Host: <b id="host">—</b></div>
+    <div>Platform: <b id="platform">—</b></div>
+    <div>Uptime: <b id="uptime">—</b></div>
+    <div>Load: <b id="load">—</b></div>
+    <div><span class="running-dot" id="status-dot"></span><b id="status-text">connecting…</b></div>
+  </div>
+</header>
+
+<div class="grid">
+  <div class="card">
+    <h2>CPU <span class="val" id="cpu-val">0%</span></h2>
+    <canvas class="chart" id="cpu-chart"></canvas>
+    <div class="cores" id="cpu-cores"></div>
+  </div>
+
+  <div class="card">
+    <h2>Memory <span class="val" id="mem-val">0%</span></h2>
+    <canvas class="chart" id="mem-chart"></canvas>
+    <div class="stats-row">
+      <div><div class="label">Used</div><div class="num" id="mem-used">—</div></div>
+      <div><div class="label">Total</div><div class="num" id="mem-total">—</div></div>
+      <div><div class="label">Swap</div><div class="num" id="mem-swap">—</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Network <span class="val" id="net-val">↓ 0 / ↑ 0</span></h2>
+    <canvas class="chart" id="net-chart"></canvas>
+    <div class="legend"><span><i style="background:var(--green)"></i>Download</span><span><i style="background:var(--accent)"></i>Upload</span></div>
+    <div class="stats-row">
+      <div><div class="label">↓ Received</div><div class="num" id="net-recv">—</div></div>
+      <div><div class="label">↑ Sent</div><div class="num" id="net-sent">—</div></div>
+    </div>
+    <div class="bars" id="net-ifaces"></div>
+  </div>
+
+  <div class="card">
+    <h2>Disk <span class="val" id="disk-val">R 0 / W 0</span></h2>
+    <canvas class="chart" id="disk-chart"></canvas>
+    <div class="legend"><span><i style="background:var(--purple)"></i>Read</span><span><i style="background:var(--yellow)"></i>Write</span></div>
+    <div class="stats-row">
+      <div><div class="label">↓ Read</div><div class="num" id="disk-read">—</div></div>
+      <div><div class="label">↑ Write</div><div class="num" id="disk-write">—</div></div>
+    </div>
+    <div class="bars" id="disk-parts"></div>
+  </div>
+
+  <div class="card">
+    <h2>Sensors <span class="val" id="sens-val">—</span></h2>
+    <div class="bars" id="sens-bars" style="height: 165px; overflow-y: auto;"></div>
+  </div>
+
+  <div class="card">
+    <h2>Processes <span class="val" id="proc-val">—</span></h2>
+    <div class="bars" id="proc-bars" style="height: 165px; overflow-y: auto;"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const PEAK = { cpu: 0, mem: 0, netRecv: 0, netSent: 0, diskRead: 0, diskWrite: 0 };
+
+let offline = false;
+let hidden = false;
+
+/* ---------- formatting ---------- */
+function fmtBytes(b) {
+  if (b === null || b === undefined || isNaN(b)) return "—";
+  const u = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0; b = Math.max(0, b);
+  while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+  return b.toFixed(i === 0 ? 0 : 1) + " " + u[i];
+}
+function fmtRate(b) { return fmtBytes(b) + "/s"; }
+function fmtUptime(s) {
+  s = Math.floor(s);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return (d > 0 ? d + "d " : "") + h + "h " + m + "m";
+}
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function colorFor(p) { return p < 60 ? "rgb(0,255,102)" : p < 85 ? "rgb(255,204,0)" : "rgb(255,51,51)"; }
+
+/* ---------- speedometer gauges ---------- */
+function dpr() { return window.devicePixelRatio || 1; }
+const canvasSizes = new Map(); // avoid layout thrash every tick
+function setupCanvas(c) {
+  const r = c.getBoundingClientRect();
+  const w = Math.round(r.width * dpr()), h = Math.round(r.height * dpr());
+  if (!canvasSizes.has(c) || canvasSizes.get(c).w !== w || canvasSizes.get(c).h !== h) {
+    c.width = w; c.height = h;
+    canvasSizes.set(c, { w, h });
+  }
+  return c.getContext("2d");
+}
+const A0 = Math.PI * 0.75, A1 = Math.PI * 2.25, SPAN = A1 - A0; // 270° sweep
+const eased = new Map(); // canvas.id -> eased needle state
+
+function polar(cx, cy, r, a) { return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
+
+function shortBytes(b) {
+  const u = ["", "K", "M", "G", "T"];
+  let i = 0;
+  while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+  return (b >= 10 || i === 0 ? Math.round(b) : b.toFixed(1)) + u[i];
+}
+
+// auto-scaling max for rate gauges: ratchets up instantly, decays slowly
+const autoMax = { net: 64 * 1024, disk: 64 * 1024 };
+function bumpAuto(key, vals) {
+  const m = Math.max(...vals, 0);
+  if (m > autoMax[key]) autoMax[key] = m;
+  autoMax[key] = Math.max(64 * 1024, autoMax[key] * 0.999);
+  return autoMax[key];
+}
+
+function setGauge(canvas, frac, opts, frac2) {
+  let st = eased.get(canvas.id);
+  if (!st) {
+    st = { f: frac, t: frac, f2: frac2 ?? null, t2: frac2 ?? null, opts: null };
+    eased.set(canvas.id, st);
+  }
+  st.t = Math.min(1, Math.max(0, frac));
+  st.t2 = frac2 == null ? null : Math.min(1, Math.max(0, frac2));
+  st.opts = opts;
+}
+
+function gaugeFrame() {
+  eased.forEach((st, id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    st.f += (st.t - st.f) * 0.16;
+    if (st.t2 != null) st.f2 = st.f2 == null ? st.t2 : st.f2 + (st.t2 - st.f2) * 0.16;
+    const o = st.opts || {};
+    o.frac2 = st.t2 != null ? st.f2 : null;
+    drawGauge(el, st.f, o);
+  });
+  requestAnimationFrame(gaugeFrame); // auto-pauses when tab hidden
+}
+requestAnimationFrame(gaugeFrame);
+
+function drawGauge(canvas, frac, opts) {
+  const ctx = setupCanvas(canvas);
+  const W = canvas.width, H = canvas.height;
+  const u = dpr();
+  const cx = W / 2, cy = H * 0.54;
+  const R = Math.min(W * 0.42, H * 0.50); // keeps the 270° wedge fully inside the canvas
+
+  ctx.clearRect(0, 0, W, H);
+
+  // dial face (pie wedge)
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.arc(cx, cy, R + 6 * u, A0, A1);
+  ctx.closePath();
+  ctx.fillStyle = "#1c2330";
+  ctx.fill();
+
+  // colored arc zones: green → yellow → red
+  let z0 = A0;
+  [[0.60, "rgba(0,255,102,0.12)"], [0.85, "rgba(255,204,0,0.12)"], [1, "rgba(255,51,51,0.12)"]].forEach(([f, col]) => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, z0, A0 + f * SPAN);
+    ctx.arc(cx, cy, R * 0.80, A0 + f * SPAN, z0, true);
+    ctx.closePath();
+    ctx.fillStyle = col;
+    ctx.fill();
+    z0 = A0 + f * SPAN;
+  });
+
+  // ticks + numeric labels every 25%
+  ctx.strokeStyle = "rgba(0,255,255,0.55)";
+  ctx.lineWidth = 1.5 * u;
+  ctx.font = 9 * u + 'px "Share Tech Mono", monospace';
+  ctx.fillStyle = "rgba(0,180,200,0.85)";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const steps = 8;
+  for (let i = 0; i <= steps; i++) {
+    const a = A0 + (i / steps) * SPAN;
+    const major = i % 2 === 0;
+    const [x1, y1] = polar(cx, cy, R, a);
+    const [x2, y2] = polar(cx, cy, R - (major ? 9 : 5) * u, a);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    if (major) {
+      const t = (i / steps) * (opts.max || 1);
+      const [tx, ty] = polar(cx, cy, R - 18 * u, a);
+      ctx.fillText(opts.tickFmt ? opts.tickFmt(t) : String(Math.round(t)), tx, ty);
+    }
+  }
+
+  // rim
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, A0, A1);
+  ctx.strokeStyle = "rgba(0,255,255,0.35)";
+  ctx.lineWidth = 2 * u;
+  ctx.stroke();
+
+  // center digital readout
+  ctx.fillStyle = opts.color;
+  ctx.font = 21 * u + 'px "Share Tech Mono", monospace';
+  ctx.shadowColor = opts.color;
+  ctx.shadowBlur = 10;
+  ctx.fillText(opts.value, cx, cy - R * 0.32);
+  ctx.shadowBlur = 0;
+  if (opts.sub) {
+    ctx.fillStyle = "rgba(0,180,200,0.9)";
+    ctx.font = 9 * u + 'px "Share Tech Mono", monospace';
+    ctx.fillText(opts.sub, cx, cy - R * 0.32 + 13 * u);
+  }
+
+  drawNeedle(ctx, cx, cy, R, frac, opts.color);
+  if (opts.frac2 != null) drawNeedle(ctx, cx, cy, R * 0.70, opts.frac2, opts.color2);
+}
+
+function drawNeedle(ctx, cx, cy, r, frac, color) {
+  const u = dpr();
+  const a = A0 + Math.min(1, Math.max(0, frac)) * SPAN;
+  const [tipX, tipY] = polar(cx, cy, r - 5 * u, a);
+  const [bx, by] = polar(cx, cy, 9 * u, a + Math.PI);
+  const [lx, ly] = polar(cx, cy, 4 * u, a + Math.PI / 2);
+  const [rx, ry] = polar(cx, cy, 4 * u, a - Math.PI / 2);
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY); ctx.lineTo(lx, ly); ctx.lineTo(bx, by); ctx.lineTo(rx, ry);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 12;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4 * u, 0, Math.PI * 2);
+  ctx.fillStyle = "#0a1423";
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5 * u;
+  ctx.stroke();
+}
+function push(key, val) { if (val > PEAK[key]) PEAK[key] = val; }
+
+/* ---------- live tab title ---------- */
+function setTitle(cpuPct, memPct) {
+  document.title = `CPU ${Math.round(cpuPct)}% · MEM ${Math.round(memPct)}% — System Monitor`;
+}
+
+/* ---------- status ---------- */
+function setStatus(ok) {
+  if (offline === ok) return; // state unchanged
+  offline = !ok;
+    const dot = document.getElementById("status-dot");
+    const txt = document.getElementById("status-text");
+    if (ok) {
+      dot.style.background = "var(--green)";
+      dot.style.boxShadow = "0 0 8px var(--green)";
+      txt.textContent = "live";
+      txt.classList.remove("offline");
+    } else {
+      dot.style.background = "var(--red)";
+      dot.style.boxShadow = "0 0 8px var(--red)";
+      txt.textContent = "offline";
+      txt.classList.add("offline");
+    }
+}
+
+/* ---------- DOM helpers ---------- */
+function setText(id, v) { document.getElementById(id).textContent = v; }
+function barRow(label, value, pct, color) {
+  return '<div class="bar-row"><div class="top"><b>' + esc(label) + '</b><span>' + esc(value) + '</span></div>' +
+    '<div class="bar"><i style="width:' + Math.min(100, Math.max(0, pct)) + '%;background:' + color + ';color:' + color + '"></i></div></div>';
+}
+
+function tempColor(t, high, critical) {
+  if (critical && t >= critical) return "rgb(255,51,51)";
+  if (high && t >= high) return "rgb(255,204,0)";
+  return colorFor(t);
+}
+
+function renderCpu(cpu) {
+  setText("cpu-val", cpu.total + "%");
+  push("cpu", cpu.total);
+  setGauge(document.getElementById("cpu-chart"), cpu.total / 100,
+    { value: Math.round(cpu.total) + "%", sub: "CPU LOAD", color: "rgb(0,255,255)", max: 100 });
+  const coresEl = document.getElementById("cpu-cores");
+  coresEl.innerHTML = "";
+  cpu.cores.forEach((c, idx) => {
+    const div = document.createElement("div");
+    div.className = "core";
+    div.title = "Core " + idx + ": " + c + "%";
+    const i = document.createElement("i");
+    i.style.height = c + "%";
+    i.style.background = colorFor(c);
+    i.setAttribute("data-c", Math.round(c));
+    div.appendChild(i);
+    coresEl.appendChild(div);
+  });
+}
+
+function renderMem(mem) {
+  setText("mem-val", mem.percent + "%");
+  setText("mem-used", fmtBytes(mem.used));
+  setText("mem-total", fmtBytes(mem.total));
+  setText("mem-swap", mem.swap_percent + "%");
+  push("mem", mem.percent);
+  setGauge(document.getElementById("mem-chart"), mem.percent / 100,
+    { value: mem.percent.toFixed(1) + "%", sub: "MEMORY", color: colorFor(mem.percent), max: 100 });
+}
+
+function renderNet(net) {
+  setText("net-val", "↓ " + fmtRate(net.recv_rate) + " / ↑ " + fmtRate(net.sent_rate));
+  setText("net-recv", fmtBytes(net.bytes_recv));
+  setText("net-sent", fmtBytes(net.bytes_sent));
+  push("netRecv", net.recv_rate);
+  push("netSent", net.sent_rate);
+  const netMax = bumpAuto("net", [net.recv_rate, net.sent_rate]);
+  setGauge(document.getElementById("net-chart"), net.recv_rate / netMax,
+    { value: "↓ " + shortBytes(net.recv_rate), sub: "↓ RECV  " + shortBytes(netMax) + " MAX", color: "rgb(0,255,102)", max: netMax, tickFmt: shortBytes,
+      frac2: net.sent_rate / netMax, color2: "rgb(0,255,255)" });
+  const dn = document.getElementById("net-ifaces");
+  const entries = Object.entries(net.interfaces || {});
+  if (!entries.length) { dn.innerHTML = '<div class="sect-label">No active interfaces</div>'; return; }
+  dn.innerHTML = entries.slice(0, 6).map(([name, f]) => {
+    const up = f.up !== false;
+    return '<div class="bar-row"><div class="top"><b>' + esc(name) + (up ? "" : " ⚠") + '</b><span>' +
+      esc(f.ip || "—") + '</span></div>' +
+      '<div class="top" style="margin-top:2px"><span>↓ ' + fmtRate(f.recv_rate) + '</span><span>↑ ' + fmtRate(f.sent_rate) + '</span></div></div>';
+  }).join("");
+}
+
+function renderDisk(disk) {
+  setText("disk-val", "R " + fmtRate(disk.read_rate) + " / W " + fmtRate(disk.write_rate));
+  setText("disk-read", fmtRate(disk.read_rate));
+  setText("disk-write", fmtRate(disk.write_rate));
+  push("diskRead", disk.read_rate);
+  push("diskWrite", disk.write_rate);
+  const diskMax = bumpAuto("disk", [disk.read_rate, disk.write_rate]);
+  setGauge(document.getElementById("disk-chart"), disk.read_rate / diskMax,
+    { value: "R " + shortBytes(disk.read_rate), sub: "R/W  " + shortBytes(diskMax) + " MAX", color: "rgb(204,102,255)", max: diskMax, tickFmt: shortBytes,
+      frac2: disk.write_rate / diskMax, color2: "rgb(255,204,0)" });
+  const dp = document.getElementById("disk-parts");
+  dp.innerHTML = (disk.partitions || []).map(p =>
+    barRow(p.mountpoint, p.percent + "% · " + fmtBytes(p.used) + " / " + fmtBytes(p.total), p.percent, colorFor(p.percent))
+  ).join("");
+}
+
+function renderSensors(sens) {
+  let html = "", maxTemp = 0;
+  Object.entries(sens.temps || {}).forEach(([group, entries]) => {
+    entries.forEach(e => {
+      if (e.current > maxTemp) maxTemp = e.current;
+      html += barRow(e.label, e.current + "°C", e.current, tempColor(e.current, e.high, e.critical));
+    });
+  });
+  if (sens.battery) {
+    const b = sens.battery;
+    let timeLeft = "";
+    if (b.secsleft > 0) timeLeft = " · " + fmtUptime(b.secsleft) + " left";
+    else if (b.secsleft === -2) timeLeft = " · ∞"; // POWER_TIME_UNLIMITED (plugged in)
+    html += barRow("Battery" + (b.power_plugged ? " ⚡" : ""), b.percent + "%" + timeLeft, b.percent,
+      b.power_plugged ? "rgb(0,255,102)" : colorFor(100 - b.percent));
+  }
+  setText("sens-val", maxTemp > 0 ? maxTemp + "°C" : (sens.battery ? sens.battery.percent + "%" : "—"));
+  document.getElementById("sens-bars").innerHTML = html || '<div class="sect-label">No sensors detected</div>';
+}
+
+function procLine(p, val, valColor) {
+  return '<div class="proc-line"><span class="pid">' + p.pid + ' · ' + esc(p.user || "") + '</span>' +
+    '<span class="name" title="' + esc(p.name) + '">' + esc(p.name) + '</span>' +
+    '<span class="pct" style="color:' + valColor + '">' + val + '</span></div>';
+}
+
+function renderProcs(proc) {
+  setText("proc-val", proc.count.toLocaleString() + " procs");
+  let html = '<div class="sect-label">TOP CPU</div>';
+  proc.top_cpu.forEach(p => {
+    html += '<div class="bar-row">' +
+      procLine(p, p.cpu.toFixed(1) + "%", "var(--accent)") +
+      '<div class="bar"><i style="width:' + Math.min(100, p.cpu * 2) + '%;background:var(--accent);color:var(--accent)"></i></div></div>';
+  });
+  html += '<div class="sect-label" style="margin-top:10px;">TOP MEMORY</div>';
+  proc.top_mem.forEach(p => {
+    html += '<div class="bar-row">' +
+      procLine(p, p.mem.toFixed(1) + "%", "var(--purple)") +
+      '<div class="bar"><i style="width:' + Math.min(100, p.mem * 2) + '%;background:var(--purple);color:var(--purple)"></i></div></div>';
+  });
+  document.getElementById("proc-bars").innerHTML = html;
+}
+
+/* ---------- main loop ---------- */
+async function tick() {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    const res = await fetch("/api/stats", { signal: ctrl.signal, cache: "no-store" });
+    clearTimeout(t);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const d = await res.json();
+    setStatus(true);
+
+    setText("host", d.host || location.hostname);
+    setText("platform", d.platform || "—");
+    setText("uptime", fmtUptime(d.uptime ?? (d.timestamp - d.boot_time)));
+    if (d.load_avg) setText("load", d.load_avg.join(" / "));
+
+    if (d.cpu && d.cpu.cores) renderCpu(d.cpu);
+    if (d.memory && d.memory.percent != null) renderMem(d.memory);
+    if (d.network && d.network.interfaces) renderNet(d.network);
+    if (d.disk && d.disk.partitions) renderDisk(d.disk);
+    if (d.sensors) renderSensors(d.sensors);
+    if (d.processes && d.processes.top_cpu) renderProcs(d.processes);
+    if (d.cpu && d.memory) setTitle(d.cpu.total, d.memory.percent);
+
+    // session peaks available on hover over header values
+    setText("cpu-val", d.cpu.total + "%");
+    document.getElementById("cpu-val").title = "Session peak: " + Math.round(PEAK.cpu) + "%";
+    document.getElementById("net-val").title = "Peak ↓ " + fmtRate(PEAK.netRecv) + " · ↑ " + fmtRate(PEAK.netSent);
+    document.getElementById("disk-val").title = "Peak R " + fmtRate(PEAK.diskRead) + " · W " + fmtRate(PEAK.diskWrite);
+  } catch (e) {
+    setStatus(false);
+  }
+}
+
+let _ticking = false;
+async function tickLoop() {
+  if (_ticking || hidden) return;
+  _ticking = true;
+  await tick();
+  _ticking = false;
+}
+
+tickLoop();
+const timer = setInterval(tickLoop, 1000);
+
+document.addEventListener("visibilitychange", () => {
+  hidden = document.hidden;
+  if (!hidden) tickLoop(); // refresh immediately on return
+});
+
+window.addEventListener("resize", () => {
+  canvasSizes.clear(); // gauges redraw on next animation frame
+});
+</script>
+</body>
+</html>
